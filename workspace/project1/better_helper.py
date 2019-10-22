@@ -16,19 +16,24 @@ class BayesScore():
         self.py_df = df-1;
         self.N, self.n = df.shape
 
-        self.G_prev = None
-        self.score_prev = 0
-
-        self.R = (df.max()).to_dict()
-        # R_list = df.max()
-        # self.Q = {}
-        # self.M = defaultdict(lambda:0)
+        # self.G_prev = None
+        # self.score_prev = 0
 
         # variables = df.columns.values.tolist()
         self.node2idx = {k: v for v, k in enumerate(df.columns.values.tolist())}
         self.idx2node = {y:x for x,y in self.node2idx.items()}
         # self.parents_dict = {}
         # self.num_parents_dict = {}
+
+
+        self.R={}
+        max_values = (df.max()).to_list()
+        for i in range(len(max_values)):
+            self.R[self.idx2node[i]] = max_values[i]
+        # R_list = df.max()
+        # self.Q = {}
+        # self.M = defaultdict(lambda:0)
+
 
         # self.j_lookup={} #format {parents_idx:j}
         self.j_lookup = [{} for _ in range(self.n)]
@@ -42,7 +47,7 @@ class BayesScore():
     def get_parents_R(self,parents):
         parents_R = []
         for i in range(len(parents)):
-            parents_R.append(self.R[parents[i]])
+            parents_R.append(self.R[self.idx2node[parents[i]]])
         return parents_R
 
     # def get_change(self, change):
@@ -56,29 +61,14 @@ class BayesScore():
     def get_bayesian_score(self, G):
         # pdb.set_trace()
         self.parents_dict = {}
-        self.num_parents_dict = {}
-        self.Q = {}
         self.M = defaultdict(lambda:0)
         self.j_lookup = [{} for _ in range(self.n)]
         self.i_lookup = [{} for _ in range(self.n)]
 
         for i in range(self.n): #for each variable
-            current_node = self.idx2node[i]
-            parents = list(nx.ancestors(G, current_node))
+
+            parents = list(G.predecessors( i))
             self.parents_dict[self.idx2node[i]] = parents
-
-
-            if not parents :#if there is no parents
-                num_parents = 0
-                self.Q[current_node] = 1
-            else:
-                num_pa_inst =1
-                num_parents = len(parents)
-                for j in range(num_parents):
-                    num_pa_inst *= self.R[parents[j]]
-                self.Q[current_node] = num_pa_inst
-
-            self.num_parents_dict[self.idx2node[i]]=num_parents #number of parents
         lap2 = time.time()
 
         #build M
@@ -86,11 +76,11 @@ class BayesScore():
             data = self.df.iloc[sample] #data starts with zero
             data_ls = data.to_list()
 
-            lap7, lap8, lap5, lap6=(0.0, 0.0, 0.0, 0.0)
+            # lap7, lap8, lap5, lap6=(0.0, 0.0, 0.0, 0.0)
             for i in range(len(data)):
-                lap5 = time.time()
+                # lap5 = time.time()
                 parents = self.parents_dict[self.idx2node[i]]
-                lap6=time.time()
+                # lap6=time.time()
                 # pdb.set_trace()
                 if not parents: #if there is no parents
                     j = 1
@@ -103,6 +93,7 @@ class BayesScore():
                     if key in jdict:
                         j = jdict[key]
                     else:
+                        # pdb.set_trace()
                         j=np.ravel_multi_index(parents_values,self.get_parents_R(parents))
                         self.j_lookup[i][key] = j
                     lap8 = time.time()
@@ -113,12 +104,9 @@ class BayesScore():
 
         #calculate score
         score = 0
-        # for i in range(self.n):
         for i in list(self.idx2node.keys()):
-            # print('variable ',self.idx2node[i])
             j_list = list(self.j_lookup[i].values())
             a_ij0 = self.R[self.idx2node[i]]
-            # var_score=0
             if not j_list:
                 m_ij0 = 0
                 j =1
